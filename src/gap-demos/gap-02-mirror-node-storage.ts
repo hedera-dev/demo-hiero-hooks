@@ -1,13 +1,16 @@
 /**
  * gap-02-mirror-node-storage.ts
  *
- * Gap M-1: Hook storage query endpoint documented but not deployed
+ * Gap M-1: Hook storage query endpoint - storage visibility unconfirmed
  *
  * hedera-docs PR #362 documents this endpoint for querying hook storage:
  *   GET /api/v1/accounts/{id}/hooks/{hookId}/storage
  *
- * As of April 2026, this endpoint returns 404 on both testnet and previewnet.
- * The fallback (GET /api/v1/contracts/{id}/state) also returns empty results
+ * Update (April 3, 2026): The endpoint is now deployed and returns HTTP 200.
+ * When queried before any HookStoreTransaction writes, it returns {"storage":[]}.
+ * Whether it surfaces values written by HookStoreTransaction is unconfirmed -
+ * re-run after 03-set-cap.ts to verify.
+ * The fallback (GET /api/v1/contracts/{id}/state) still returns empty results
  * because hook-scoped storage is separate from EVM contract storage.
  *
  * Run:      npx tsx src/gap-demos/gap-02-mirror-node-storage.ts
@@ -26,10 +29,11 @@ async function main() {
 
   const { mirrorNodeUrl } = getNetworkConfig();
 
-  console.log("=== Gap M-1: Hook storage query endpoint not deployed ===");
+  console.log("=== Gap M-1: Hook storage query endpoint - storage visibility unconfirmed ===");
   console.log("");
   console.log("Gap:  hedera-docs PR #362 documents GET /api/v1/accounts/{id}/hooks/{hookId}/storage");
-  console.log("      but this endpoint returns 404 on testnet and previewnet (April 2026).");
+  console.log("      Update (April 2026): endpoint now returns 200 OK, but storage[] may be empty.");
+  console.log("      Whether HookStoreTransaction writes appear here is unconfirmed.");
   console.log(`Account: ${state.capAccountId}  hookId: ${state.capHookId}`);
   console.log("");
 
@@ -110,11 +114,12 @@ async function main() {
 
   console.log("");
   console.log("=== Summary ===");
-  console.log("Gap M-1: /api/v1/accounts/{id}/hooks/{hookId}/storage returns 404 (not deployed).");
+  console.log("Gap M-1: /api/v1/accounts/{id}/hooks/{hookId}/storage now returns 200 (endpoint deployed).");
+  console.log("         Storage array may be empty if queried before HookStoreTransaction writes.");
   console.log("         /api/v1/contracts/{id}/state does not surface hook storage either.");
   console.log("Workaround: use /api/v1/transactions?transactiontype=HOOKSTORE to confirm writes.");
   console.log("            Verify hook logic by running transfers and observing SUCCESS vs REJECTED.");
-  console.log("Fix needed: deploy the storage endpoint, or document it as coming soon.");
+  console.log("Next step: re-run after 03-set-cap.ts to confirm storage values appear in response.");
 }
 
 main().catch((err) => {
