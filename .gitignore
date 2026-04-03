@@ -1,0 +1,17 @@
+.DS_Store
+
+# Environment and credentials
+.env
+
+# Runtime state (network-specific IDs - reset when switching networks)
+.state.json
+
+# Raw cost data (regenerated on each run; COSTS.md is the tracked version)
+.costs.json
+
+# Dependencies
+node_modules/
+
+# Generated build artifacts
+build/
+verify-bundles/

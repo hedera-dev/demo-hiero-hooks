@@ -1,0 +1,5 @@
+node_modules/
+vendor/
+verify-bundles/
+src/contracts/*.json
+src/contracts/*.txt

@@ -1,0 +1,36 @@
+{
+  "name": "demo-hiero-hooks",
+  "version": "1.0.0",
+  "description": "End-to-end demo for HIP-1195 Hiero Hooks on Hedera",
+  "type": "module",
+  "_sdkNote": "Using v2.83.0-beta.1 built from github:hiero-ledger/hiero-sdk-js#v2.83.0-beta.1. The SDK is a pnpm monorepo with workspace:* deps that npm cannot resolve directly. Tarballs in vendor/ were built with: git clone --depth 1 --branch v2.83.0-beta.1, pnpm install, task build, npm pack. Once v2.83.0 publishes to npm, change all three @hiero-ledger/* entries to the npm versions and delete vendor/.",
+  "scripts": {
+    "compile": "npx tsx scripts/compile.ts",
+    "setup": "npx tsx src/00-setup-verify.ts",
+    "lint": "eslint src/ test/",
+    "lint:fix": "eslint src/ test/ --fix",
+    "format": "prettier --write 'src/**/*.ts' 'test/**/*.ts'",
+    "format:check": "prettier --check 'src/**/*.ts' 'test/**/*.ts'",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@hiero-ledger/cryptography": "file:vendor/hiero-ledger-cryptography-1.18.0.tgz",
+    "@hiero-ledger/proto": "file:vendor/hiero-ledger-proto-2.28.0.tgz",
+    "@hiero-ledger/sdk": "file:vendor/hiero-ledger-sdk-2.83.0-beta.1.tgz",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@typescript-eslint/parser": "^8.58.0",
+    "eslint": "^9.0.0",
+    "solc": "0.8.34",
+    "prettier": "^3.3.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
