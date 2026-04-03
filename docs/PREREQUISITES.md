@@ -40,14 +40,6 @@ cd demo-hiero-hooks
 npm install
 ```
 
-Expected output from `npm install`:
-
-```
-added XX packages in Xs
-```
-
-**TypeScript execution:** The demo scripts are TypeScript files (`.ts`). They run via `npx tsx`, which handles compilation transparently. You do not need to install `tsx` globally; `npx` fetches it on first use.
-
 ## Configure Environment
 
 ```bash
@@ -83,7 +75,7 @@ npx tsx src/00-setup-verify.ts
 Expected output:
 
 ```
-=== Hedera Hooks Demo - Setup Verification ===
+=== Hiero Hooks Demo - Setup Verification ===
 Network:      testnet
 Operator ID:  0.0.4515612
 Mirror Node:  https://testnet.mirrornode.hedera.com
@@ -106,42 +98,8 @@ If the script fails, check the table below.
 | `TIMEOUT` or `ECONNREFUSED`                               | Network unreachable.                                        | Check your internet connection. Verify `HEDERA_NETWORK` is set to a valid value (`previewnet`, `testnet`, or `mainnet`). |
 | `Cannot find module`                                      | Dependencies not installed.                                 | Run `npm install` from the project root.                                                                                 |
 
-## Network Switching
-
-All scripts read `HEDERA_NETWORK` from `.env` to determine which network to use. Change a single variable to switch:
-
-```bash
-# In .env
-HEDERA_NETWORK=testnet   # or testnet, or mainnet
-```
-
-The SDK client, mirror node URLs, and Hashscan links all adjust automatically based on this value.
-
-**When you switch networks, delete `.state.json`:**
-
-```bash
-rm -f .state.json
-```
-
-The `.state.json` file stores contract IDs, account IDs, and hook IDs from previous script runs. These IDs are network-specific and will not resolve on a different network. Deleting the file forces scripts to redeploy from scratch on the new network.
-
 ## Cost Expectations
-
-Hook operations cost more than typical Hedera transactions. Deploying a hook contract, creating an account with an attached hook, and triggering transfers with hook invocations each consume several HBAR.
-
-A full run through all demo scripts (both the HelloHooks and ManagedTransferCap flows, plus cleanup) costs approximately **80-100 HBAR** at current testnet exchange rates. Repeating the demos or encountering errors that require retries will increase the total.
 
 See [COSTS.md](../COSTS.md) for a detailed log of actual observed fees per operation.
 
 **Recommendation:** Start with at least 200 HBAR in your testnet account. Testnet HBAR is free; request more from the faucet whenever your balance runs low.
-
-## Verification Checklist
-
-Before proceeding to the tutorial scripts, confirm each item:
-
-- [ ] Node.js >= 18.0.0 installed (`node --version`)
-- [ ] `npm install` completed without errors
-- [ ] `.env` file created with all three variables populated
-- [ ] `OPERATOR_PRIVATE_KEY` is an ECDSA key (not ED25519)
-- [ ] `npx tsx src/00-setup-verify.ts` runs and prints your account balance
-- [ ] Balance shows >= 200 HBAR

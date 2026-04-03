@@ -1,6 +1,6 @@
 # Background: Hiero Hooks and HIP-1195
 
-Topic primer for developers new to Hedera hooks. Read this before touching any code. It covers what hooks are, why they exist, and how they fit into the broader Hedera ecosystem.
+Topic primer for developers new to Hiero hooks. Read this before touching any code. It covers what hooks are, why they exist, and how they fit into the broader Hedera ecosystem.
 
 ---
 
@@ -61,13 +61,13 @@ The distinction: HelloHooks demonstrates the hook mechanism with ProposedTransfe
 
 ## How Hooks Compare to Alternatives
 
-| Mechanism | Runs at | Owner controls | Cost | Use case |
-|-----------|---------|---------------|------|----------|
-| **Smart contracts** (ContractCreate/ContractCall) | Dedicated contract address | Full EVM programmability; all parties must route through the contract | Gas-based; higher per-call cost | Arbitrary on-chain logic; DeFi, DAOs, escrow |
-| **Custom fees** (HIP-18) | Token level, set by token creator | Fee schedules on token transfers; cannot inspect full transfer context | Fixed/fractional fee per transfer | Royalties, protocol fees, revenue sharing |
-| **Allowances** (HIP-336) | Account level, set by token owner | Grants third-party spending authority up to a limit | No extra cost beyond the transfer itself | Delegated spending; DEX approvals |
-| **EIP-7702 / HIP-1340+1341** | EOA level, session-scoped delegation | EOA temporarily acts as a smart contract; great for wallet UX (batching, gas sponsorship) | Gas-based | Wallet UX improvements; session-scoped delegation |
-| **Hooks** (HIP-1195) | Account level, always-on | Solidity logic executes at transfer time with owner privileges at `0x16d` | $0.005 per invocation; $0.005 per storage write | Receiver authorization, passcode gates, transfer limits, compliance checks |
+| Mechanism                                         | Runs at                              | Owner controls                                                                            | Cost                                            | Use case                                                                   |
+| ------------------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------- |
+| **Smart contracts** (ContractCreate/ContractCall) | Dedicated contract address           | Full EVM programmability; all parties must route through the contract                     | Gas-based; higher per-call cost                 | Arbitrary on-chain logic; DeFi, DAOs, escrow                               |
+| **Custom fees** (HIP-18)                          | Token level, set by token creator    | Fee schedules on token transfers; cannot inspect full transfer context                    | Fixed/fractional fee per transfer               | Royalties, protocol fees, revenue sharing                                  |
+| **Allowances** (HIP-336)                          | Account level, set by token owner    | Grants third-party spending authority up to a limit                                       | No extra cost beyond the transfer itself        | Delegated spending; DEX approvals                                          |
+| **EIP-7702 / HIP-1340+1341**                      | EOA level, session-scoped delegation | EOA temporarily acts as a smart contract; great for wallet UX (batching, gas sponsorship) | Gas-based                                       | Wallet UX improvements; session-scoped delegation                          |
+| **Hooks** (HIP-1195)                              | Account level, always-on             | Solidity logic executes at transfer time with owner privileges at `0x16d`                 | $0.005 per invocation; $0.005 per storage write | Receiver authorization, passcode gates, transfer limits, compliance checks |
 
 Hooks occupy a space that none of the alternatives fill: **account-level, always-on, owner-controlled transfer logic** that runs without a separate contract routing layer and at a fraction of the cost.
 
@@ -93,9 +93,9 @@ Inside hook execution, `msg.sender` is the account that submitted the `TransferT
 
 The sender controls which hook function the node calls by setting the `FungibleHookType` in their `FungibleHookCall`:
 
-| Hook type | Functions called | When to use |
-|-----------|-----------------|-------------|
-| `PRE_TX_ALLOWANCE_HOOK` | `allow()` - fires once, before the transfer commits | Simple approve/reject decisions. Used by HelloHooks. |
+| Hook type                    | Functions called                                       | When to use                                                                                                           |
+| ---------------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `PRE_TX_ALLOWANCE_HOOK`      | `allow()` - fires once, before the transfer commits    | Simple approve/reject decisions. Used by HelloHooks.                                                                  |
 | `PRE_POST_TX_ALLOWANCE_HOOK` | `allowPre()` before commit; `allowPost()` after commit | Two-phase logic where you need to check state before and update state after the transfer. Used by ManagedTransferCap. |
 
 `HelloHooks` implements all three functions (`allow`, `allowPre`, `allowPost`) for completeness. It uses `PRE_TX_ALLOWANCE_HOOK` in the demo because the exact-amount check needs only a single phase - inspect `ProposedTransfers` and approve or reject.
@@ -104,7 +104,7 @@ The sender controls which hook function the node calls by setting the `FungibleH
 
 ### Gas limit and who pays
 
-The sender specifies a `gas_limit` in the `FungibleHookCall`. The Hedera node charges gas for the hook's EVM execution against this limit. If the hook exceeds the limit, the transaction fails with `CONSENSUS_GAS_EXHAUSTED`. The payer - the account submitting the transfer - pays for hook gas, not the hook owner. The intrinsic gas cost for hook invocation is 1,000 (configurable via network property `hooks.evm.intrinsicGasCost`).
+The sender specifies a `gas_limit` in the `FungibleHookCall`. The Hedera node charges gas for the hook's EVM execution against this limit. If the hook exceeds the limit, the transaction fails with `CONSENSUS_GAS_EXHAUSTED`. The payer - the account submitting the transfer - pays for hook gas, not the hook owner. The intrinsic gas cost for hook invocation is currently set to 1,000.
 
 ---
 
@@ -142,12 +142,12 @@ This means the owner uses `HookStoreTransaction` to set up state cheaply (settin
 
 ## Deployment Paths
 
-### Primary: ContractCreateTransaction via SDK (used in this demo)
+### Primary: ContractCreateFlow via SDK (used in this demo)
 
-The demo deploys hook contracts using `ContractCreateTransaction` from the Hiero JavaScript SDK. This is the recommended path because hook management operations - creating hooks, attaching them to accounts, writing to hook storage, deleting hooks - all require SDK transaction types with no JSON-RPC equivalent.
+The demo deploys hook contracts using `ContractCreateFlow` from the Hiero JavaScript SDK. `ContractCreateFlow` handles both the file upload and contract creation in a single call, rather than requiring separate `FileCreateTransaction` and `ContractCreateTransaction` steps. This is the recommended path because hook management operations - creating hooks, attaching them to accounts, writing to hook storage, deleting hooks - all require SDK transaction types with no JSON-RPC equivalent.
 
 ```
-Compile Solidity -> bytecode -> ContractCreateTransaction -> ContractId
+Compile Solidity -> bytecode (hex string) -> ContractCreateFlow -> ContractId
 ```
 
 The resulting `ContractId` is then referenced when attaching the hook to an account via `AccountUpdateTransaction`.
@@ -168,27 +168,23 @@ A single deployed contract can serve as the implementation for multiple hooks on
 
 These constraints apply as of April 2026. Hooks are a beta feature on Hedera.
 
-1. **Beta status.** Hooks are available on previewnet and testnet. Mainnet availability has not been announced. APIs may change.
+1. **One extension point.** HIP-1195 defines a single extension point: `ACCOUNT_ALLOWANCE_HOOK`. There are no hook extension points for topic submissions, token operations, or other transaction types.
 
-2. **One extension point.** HIP-1195 defines a single extension point: `ACCOUNT_ALLOWANCE_HOOK`. There are no hook extension points for topic submissions, token operations, or other transaction types.
+2. **Hooks are not automatic.** The sender must explicitly reference the hook by including a `FungibleHookCall` (or `NftHookCall`) in their `TransferTransaction`. If the sender omits the hook reference, the transfer behaves as if no hook exists - and fails if `receiver_sig_required=true`.
 
-3. **Hooks are not automatic.** The sender must explicitly reference the hook by including a `FungibleHookCall` (or `NftHookCall`) in their `TransferTransaction`. If the sender omits the hook reference, the transfer behaves as if no hook exists - and fails if `receiver_sig_required=true`.
+3. **sstore blocks hook deletion.** If a hook writes to storage during execution (as `ManagedTransferCap` does when it updates the remaining cap with `sstore`), those slots must be explicitly zeroed via `HookStoreTransaction` before the hook can be deleted. Attempting to delete a hook with non-zero storage fails with `HOOK_DELETION_REQUIRES_ZERO_STORAGE_SLOTS`. Each demo's cleanup script (`src/hello-hooks/06-cleanup.ts` and `src/managed-transfer-cap/09-cleanup.ts`) handles this.
 
-4. **sstore blocks hook deletion.** If a hook writes to storage during execution (as `ManagedTransferCap` does when it updates the remaining cap with `sstore`), those slots must be explicitly zeroed via `HookStoreTransaction` before the hook can be deleted. Attempting to delete a hook with non-zero storage fails with `HOOK_DELETION_REQUIRES_ZERO_STORAGE_SLOTS`. Each demo's cleanup script (`src/hello-hooks/06-cleanup.ts` and `src/managed-transfer-cap/09-cleanup.ts`) handles this.
+4. **Max 10 hook invocations per CryptoTransfer.** A single transfer transaction can invoke at most 10 hooks, producing up to 50 child records.
 
-5. **Max 10 hook invocations per CryptoTransfer.** A single transfer transaction can invoke at most 10 hooks, producing up to 50 child records.
-
-6. **No batch or scheduled transaction support.** Hooks cannot currently be triggered from within batch transactions or scheduled transactions.
+5. **No batch or scheduled transaction support.** Hooks cannot currently be triggered from within batch transactions or scheduled transactions.
 
 ---
 
 ## Further Reading
 
-| Resource | Link |
-|----------|------|
-| HIP-1195 - Hiero Hooks specification | [hiero-improvement-proposals/HIP/hip-1195.md](https://github.com/hiero-ledger/hiero-improvement-proposals/blob/main/HIP/hip-1195.md) |
-| hedera-docs PR #362 - Hooks documentation | [hashgraph/hedera-docs/pull/362](https://github.com/hashgraph/hedera-docs/pull/362) |
-| Hiero JavaScript SDK | [hiero-ledger/hiero-sdk-js](https://github.com/hiero-ledger/hiero-sdk-js) |
-| Hiero Mirror Node | [hiero-ledger/hiero-mirror-node](https://github.com/hiero-ledger/hiero-mirror-node) |
-| HIP-1340 / HIP-1341 - EIP-7702 on Hedera (future) | [hiero-improvement-proposals](https://github.com/hiero-ledger/hiero-improvement-proposals) |
-| hedera-docs Issue #491 - Tutorial request | [hashgraph/hedera-docs/issues/491](https://github.com/hashgraph/hedera-docs/issues/491) |
+| Resource                                          | Link                                                                                                                                 |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| HIP-1195 - Hiero Hooks specification              | [hiero-improvement-proposals/HIP/hip-1195.md](https://github.com/hiero-ledger/hiero-improvement-proposals/blob/main/HIP/hip-1195.md) |
+| Hiero JavaScript SDK                              | [hiero-ledger/hiero-sdk-js](https://github.com/hiero-ledger/hiero-sdk-js)                                                            |
+| Hiero Mirror Node                                 | [hiero-ledger/hiero-mirror-node](https://github.com/hiero-ledger/hiero-mirror-node)                                                  |
+| HIP-1340 / HIP-1341 - EIP-7702 on Hedera (future) | [hiero-improvement-proposals](https://github.com/hiero-ledger/hiero-improvement-proposals)                                           |

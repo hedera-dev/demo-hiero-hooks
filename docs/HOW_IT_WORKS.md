@@ -43,8 +43,6 @@ Each demo is a standalone sequence of numbered scripts in its own directory. A s
 │                          │   │    ▼                                  │
 └──────────────────────────┘   │  07-increase-cap.ts                   │
                                │    ▼                                  │
-                               │  07-increase-cap.ts                   │
-                               │    ▼                                  │
                                │  08-transfer-after-increase.ts        │
                                │    ▼                                  │
                                │  09-cleanup.ts                        │
@@ -55,24 +53,24 @@ Each demo is independent - you can run one, the other, or both. They share `.sta
 
 **What each script produces and what the next consumes:**
 
-| Script | Reads from .state.json | Writes to .state.json | On-chain effect |
-|--------|------------------------|----------------------|-----------------|
-| `00-setup-verify` | nothing | nothing | Queries operator balance |
-| `hello-hooks/01` | nothing | `contractId` | Deploys HelloHooks contract |
-| `hello-hooks/02` | `contractId` | `testAccountId`, `testAccountPrivKey`, `hookId` | Creates account with hook attached |
-| `hello-hooks/03` | `contractId`, `testAccountId`, `hookId` | nothing | 1 HBAR transfer triggers hook (approved) |
-| `hello-hooks/04` | `contractId`, `testAccountId`, `hookId` | nothing | 2 HBAR transfer triggers hook (rejected) |
-| `hello-hooks/05` | `testAccountId`, `hookId` | nothing | Mirror node query only |
-| `hello-hooks/06` | `testAccountId`, `testAccountPrivKey`, `hookId` | removes keys | Deletes hook, verifies via mirror node |
-| `managed-transfer-cap/01` | nothing | `capContractId` | Deploys ManagedTransferCap contract |
-| `managed-transfer-cap/02` | `capContractId` | `capAccountId`, `capAccountPrivKey`, `capTokenId`, `capHookId` | Creates account, MCT token, attaches hook |
-| `managed-transfer-cap/03` | `capContractId`, `capAccountId`, `capAccountPrivKey`, `capHookId` | nothing | Writes cap value (500) to slot 0x00 |
-| `managed-transfer-cap/04` | `capAccountId`, `capTokenId`, `capHookId` | nothing | Token transfer within cap (200 MCT, succeeds) |
-| `managed-transfer-cap/05` | `capAccountId`, `capTokenId`, `capHookId` | nothing | Token transfer exceeding cap (400 MCT, rejected) |
-| `managed-transfer-cap/06` | `capContractId`, `capAccountId` | nothing | Mirror node query only |
-| `managed-transfer-cap/07` | `capContractId`, `capAccountId`, `capAccountPrivKey`, `capHookId` | nothing | Increases cap to 1000 via HookStoreTransaction |
-| `managed-transfer-cap/08` | `capAccountId`, `capTokenId`, `capHookId` | nothing | Token transfer after increase (400 MCT, succeeds) |
-| `managed-transfer-cap/09` | `capAccountId`, `capAccountPrivKey`, `capHookId` | removes keys | Clears storage, deletes hook, verifies |
+| Script                    | Reads from .state.json                                            | Writes to .state.json                                          | On-chain effect                                   |
+| ------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------- |
+| `00-setup-verify`         | nothing                                                           | nothing                                                        | Queries operator balance via mirror node          |
+| `hello-hooks/01`          | nothing                                                           | `contractId`                                                   | Deploys HelloHooks contract                       |
+| `hello-hooks/02`          | `contractId`                                                      | `testAccountId`, `testAccountPrivKey`, `hookId`                | Creates account with hook attached                |
+| `hello-hooks/03`          | `contractId`, `testAccountId`, `hookId`                           | nothing                                                        | 1 HBAR transfer triggers hook (approved)          |
+| `hello-hooks/04`          | `contractId`, `testAccountId`, `hookId`                           | nothing                                                        | 2 HBAR transfer triggers hook (rejected)          |
+| `hello-hooks/05`          | `testAccountId`, `hookId`                                         | nothing                                                        | Mirror node query only                            |
+| `hello-hooks/06`          | `testAccountId`, `testAccountPrivKey`, `hookId`                   | removes keys                                                   | Deletes hook, verifies via mirror node            |
+| `managed-transfer-cap/01` | nothing                                                           | `capContractId`                                                | Deploys ManagedTransferCap contract               |
+| `managed-transfer-cap/02` | `capContractId`                                                   | `capAccountId`, `capAccountPrivKey`, `capTokenId`, `capHookId` | Creates account, MCT token, attaches hook         |
+| `managed-transfer-cap/03` | `capContractId`, `capAccountId`, `capAccountPrivKey`, `capHookId` | nothing                                                        | Writes cap value (500) to slot 0x00               |
+| `managed-transfer-cap/04` | `capAccountId`, `capTokenId`, `capHookId`                         | nothing                                                        | Token transfer within cap (200 MCT, succeeds)     |
+| `managed-transfer-cap/05` | `capAccountId`, `capTokenId`, `capHookId`                         | nothing                                                        | Token transfer exceeding cap (400 MCT, rejected)  |
+| `managed-transfer-cap/06` | `capContractId`, `capAccountId`                                   | nothing                                                        | Mirror node query only                            |
+| `managed-transfer-cap/07` | `capContractId`, `capAccountId`, `capAccountPrivKey`, `capHookId` | nothing                                                        | Increases cap to 1000 via HookStoreTransaction    |
+| `managed-transfer-cap/08` | `capAccountId`, `capTokenId`, `capHookId`                         | nothing                                                        | Token transfer after increase (400 MCT, succeeds) |
+| `managed-transfer-cap/09` | `capAccountId`, `capAccountPrivKey`, `capHookId`                  | removes keys                                                   | Clears storage, deletes hook, verifies            |
 
 ---
 
@@ -132,32 +130,31 @@ Failing to do this produces `INVALID_ACCOUNT_ID` or `INVALID_CONTRACT_ID` errors
 
 Every SDK class imported across the demo scripts, with the script that uses it and its role.
 
-| Class | Script(s) | Purpose |
-|-------|-----------|---------|
-| `AccountBalanceQuery` | `00-setup-verify` | Queries HBAR balance to verify operator credentials |
-| `ContractCreateTransaction` | `hh/01`, `cap/01` | Deploys hook contract bytecode to the network |
-| `AccountCreateTransaction` | `hh/02`, `cap/02` | Creates test accounts with `receiverSigRequired` and hooks |
-| `TransferTransaction` | `hh/03`, `hh/04`, `cap/04`, `cap/05`, `cap/08` | Sends HBAR or HTS token transfers that trigger hooks |
-| `HookStoreTransaction` | `cap/03`, `cap/07`, `cap/09` | Writes or clears hook-scoped EVM storage slots |
-| `AccountUpdateTransaction` | `hh/06`, `cap/09` | Deletes hooks from accounts via `addHookToDelete()` |
-| `TokenCreateTransaction` | `cap/02` | Creates a test HTS fungible token (MCT) for the ManagedTransferCap demo |
-| `TokenAssociateTransaction` | `cap/02` | Associates the MCT token with the cap test account |
-| `HookCreationDetails` | `hh/02`, `cap/02` | Configures a hook at account creation: extension point, hookId, contract |
-| `HookExtensionPoint` | `hh/02`, `cap/02` | Enum; only value used is `ACCOUNT_ALLOWANCE_HOOK` |
-| `EvmHook` | `hh/02`, `cap/02` | Wraps a `ContractId` to identify the hook's implementing contract |
-| `FungibleHookCall` | `hh/03`, `hh/04`, `cap/04`, `cap/05`, `cap/08` | Attaches a hook invocation to a fungible transfer leg |
-| `FungibleHookType` | `hh/03`, `hh/04`, `cap/04`, `cap/05`, `cap/08` | Enum; `PRE_TX_ALLOWANCE_HOOK` (HelloHooks) or `PRE_POST_TX_ALLOWANCE_HOOK` (ManagedTransferCap) |
-| `EvmHookCall` | `hh/03`, `hh/04`, `cap/04`, `cap/05`, `cap/08` | Specifies `gasLimit` for the hook's EVM execution |
-| `EvmHookStorageSlot` | `cap/03`, `cap/07`, `cap/09` | Key-value pair for a hook storage write or delete |
-| `HookId` | `cap/03`, `cap/07`, `cap/09` | Composite identifier: `(entityId, hookId)` scoping storage to an account's hook |
-| `HookEntityId` | `cap/03`, `cap/07`, `cap/09` | Wraps an `AccountId` as the hook's owning entity |
-| `PrivateKey` | `hh/02`, `hh/06`, `cap/02`, `cap/03`, `cap/07`, `cap/09` | Generates ECDSA keys; parses stored keys for signing |
-| `Hbar` | `hh/02-06`, `cap/02-09` | HBAR amount wrapper for balances and fees |
-| `AccountId` | `hh/03`, `hh/04`, `hh/06`, `cap/03-09` | Parses account IDs from `.state.json` strings |
-| `ContractId` | `hh/02`, `cap/02` | Parses contract IDs for hook attachment |
-| `TokenId` | `cap/04`, `cap/05`, `cap/08` | Parses token IDs for HTS transfers |
-| `Client` | all via `client.ts` | Configured Hedera client (previewnet/testnet/mainnet) |
-| `Long` (from `long` npm) | `hh/03`, `hh/04`, `hh/06`, `cap/03-09` | 64-bit integer for `hookId` and `gasLimit` fields |
+| Class                       | Script(s)                                                | Purpose                                                                                         |
+| --------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `ContractCreateFlow`        | `hh/01`, `cap/01`                                        | Deploys hook contract bytecode to the network (handles file upload + contract creation)         |
+| `AccountCreateTransaction`  | `hh/02`, `cap/02`                                        | Creates test accounts with `receiverSigRequired` and hooks                                      |
+| `TransferTransaction`       | `hh/03`, `hh/04`, `cap/04`, `cap/05`, `cap/08`           | Sends HBAR or HTS token transfers that trigger hooks                                            |
+| `HookStoreTransaction`      | `cap/03`, `cap/07`, `cap/09`                             | Writes or clears hook-scoped EVM storage slots                                                  |
+| `AccountUpdateTransaction`  | `hh/06`, `cap/09`                                        | Deletes hooks from accounts via `addHookToDelete()`                                             |
+| `TokenCreateTransaction`    | `cap/02`                                                 | Creates a test HTS fungible token (MCT) for the ManagedTransferCap demo                         |
+| `TokenAssociateTransaction` | `cap/02`                                                 | Associates the MCT token with the cap test account                                              |
+| `HookCreationDetails`       | `hh/02`, `cap/02`                                        | Configures a hook at account creation: extension point, hookId, contract                        |
+| `HookExtensionPoint`        | `hh/02`, `cap/02`                                        | Enum; only value used is `ACCOUNT_ALLOWANCE_HOOK`                                               |
+| `EvmHook`                   | `hh/02`, `cap/02`                                        | Wraps a `ContractId` to identify the hook's implementing contract                               |
+| `FungibleHookCall`          | `hh/03`, `hh/04`, `cap/04`, `cap/05`, `cap/08`           | Attaches a hook invocation to a fungible transfer leg                                           |
+| `FungibleHookType`          | `hh/03`, `hh/04`, `cap/04`, `cap/05`, `cap/08`           | Enum; `PRE_TX_ALLOWANCE_HOOK` (HelloHooks) or `PRE_POST_TX_ALLOWANCE_HOOK` (ManagedTransferCap) |
+| `EvmHookCall`               | `hh/03`, `hh/04`, `cap/04`, `cap/05`, `cap/08`           | Specifies `gasLimit` for the hook's EVM execution                                               |
+| `EvmHookStorageSlot`        | `cap/03`, `cap/07`, `cap/09`                             | Key-value pair for a hook storage write or delete                                               |
+| `HookId`                    | `cap/03`, `cap/07`, `cap/09`                             | Composite identifier: `(entityId, hookId)` scoping storage to an account's hook                 |
+| `HookEntityId`              | `cap/03`, `cap/07`, `cap/09`                             | Wraps an `AccountId` as the hook's owning entity                                                |
+| `PrivateKey`                | `hh/02`, `hh/06`, `cap/02`, `cap/03`, `cap/07`, `cap/09` | Generates ECDSA keys; parses stored keys for signing                                            |
+| `Hbar`                      | `hh/02-06`, `cap/02-09`                                  | HBAR amount wrapper for balances and fees                                                       |
+| `AccountId`                 | `hh/03`, `hh/04`, `hh/06`, `cap/03-09`                   | Parses account IDs from `.state.json` strings                                                   |
+| `ContractId`                | `hh/02`, `cap/02`                                        | Parses contract IDs for hook attachment                                                         |
+| `TokenId`                   | `cap/04`, `cap/05`, `cap/08`                             | Parses token IDs for HTS transfers                                                              |
+| `Client`                    | all via `client.ts`                                      | Configured Hedera client (previewnet/testnet/mainnet)                                           |
+| `Long` (from `long` npm)    | `hh/03`, `hh/04`, `hh/06`, `cap/03-09`                   | 64-bit integer for `hookId` and `gasLimit` fields                                               |
 
 > `hh` = `hello-hooks/`, `cap` = `managed-transfer-cap/`
 
@@ -191,10 +188,10 @@ This accounts for the mirror node propagation delay. Without the wait, the query
 
 ### Mirror node endpoints used
 
-| Endpoint | Script | Purpose |
-|----------|--------|---------|
-| `GET /api/v1/accounts/{id}/hooks` | `hh/05`, `hh/06`, `cap/06`, `cap/09` | List hooks attached to an account |
-| `GET /api/v1/transactions?account.id={id}&transactiontype=HOOKSTORE` | `cap/06` | Find HOOKSTORE transactions for an account |
+| Endpoint                                                             | Script                               | Purpose                                    |
+| -------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------ |
+| `GET /api/v1/accounts/{id}/hooks`                                    | `hh/05`, `hh/06`, `cap/06`, `cap/09` | List hooks attached to an account          |
+| `GET /api/v1/transactions?account.id={id}&transactiontype=HOOKSTORE` | `cap/06`                             | Find HOOKSTORE transactions for an account |
 
 ---
 
@@ -247,10 +244,10 @@ The `recordCost()` function in `src/utils/cost.ts` captures the actual fee charg
 
 ### Output files
 
-| File | Format | Purpose |
-|------|--------|---------|
-| `.costs.json` | JSON array | Machine-readable fee log; delete to reset |
-| `COSTS.md` | Markdown table | Human-readable fee summary; auto-generated |
+| File          | Format         | Purpose                                    |
+| ------------- | -------------- | ------------------------------------------ |
+| `.costs.json` | JSON array     | Machine-readable fee log; delete to reset  |
+| `COSTS.md`    | Markdown table | Human-readable fee summary; auto-generated |
 
 ### Why getRecord instead of getReceipt
 
@@ -260,7 +257,7 @@ The `recordCost()` function in `src/utils/cost.ts` captures the actual fee charg
 
 ## Hook Lifecycle
 
-The demo covers the complete lifecycle of a Hedera hook from deployment through cleanup. Each phase maps to specific script numbers.
+The demo covers the complete lifecycle of a Hiero hook from deployment through cleanup. Each phase maps to specific script numbers.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -283,15 +280,15 @@ The demo covers the complete lifecycle of a Hedera hook from deployment through 
 
 ### Phase details
 
-| Phase | What happens | HelloHooks | ManagedTransferCap |
-|-------|-------------|-------------|---------------|
-| **Deploy contract** | `ContractCreateTransaction` deploys the hook's Solidity bytecode. The contract is just EVM bytecode; it becomes a "hook" only when attached to an account. | `01-deploy` | `01-deploy` |
-| **Attach to account** | `AccountCreateTransaction` (or `AccountUpdateTransaction`) binds a hook to an account using `HookCreationDetails`. The hookId is client-chosen and must match what transfer senders reference. | `02-create-account` | `02-create-account` |
-| **Configure state** | `HookStoreTransaction` writes to hook-scoped storage. HelloHooks is stateless; ManagedTransferCap needs a cap value in slot 0x00. | (none) | `03-set-cap` |
-| **Trigger via transfer** | `TransferTransaction` with `FungibleHookCall` invokes the hook. HelloHooks uses `PRE_TX_ALLOWANCE_HOOK` (single-phase); ManagedTransferCap uses `PRE_POST_TX_ALLOWANCE_HOOK` (two-phase). | `03-trigger`, `04-trigger-wrong-amount` | `04-transfer-within-cap`, `05-transfer-exceeds-cap` |
-| **Query and update** | Mirror node REST API confirms hook registration and transaction history. `HookStoreTransaction` increases the cap cheaply. | `05-query` | `06-query`, `07-increase-cap` |
-| **Re-trigger** | Transfer after state update to confirm the updated cap is in effect. | (n/a) | `08-transfer-after-increase` |
-| **Cleanup** | Clear storage via `HookStoreTransaction`, delete hooks via `AccountUpdateTransaction.addHookToDelete()`, verify via mirror node, remove state keys. | `06-cleanup` | `09-cleanup` |
+| Phase                    | What happens                                                                                                                                                                                   | HelloHooks                              | ManagedTransferCap                                  |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | --------------------------------------------------- |
+| **Deploy contract**      | `ContractCreateFlow` deploys the hook's Solidity bytecode (handles file upload + contract creation in one call). The contract is just EVM bytecode; it becomes a "hook" only when attached to an account. | `01-deploy`                             | `01-deploy`                                         |
+| **Attach to account**    | `AccountCreateTransaction` (or `AccountUpdateTransaction`) binds a hook to an account using `HookCreationDetails`. The hookId is client-chosen and must match what transfer senders reference. | `02-create-account`                     | `02-create-account`                                 |
+| **Configure state**      | `HookStoreTransaction` writes to hook-scoped storage. HelloHooks is stateless; ManagedTransferCap needs a cap value in slot 0x00.                                                              | (none)                                  | `03-set-cap`                                        |
+| **Trigger via transfer** | `TransferTransaction` with `FungibleHookCall` invokes the hook. HelloHooks uses `PRE_TX_ALLOWANCE_HOOK` (single-phase); ManagedTransferCap uses `PRE_POST_TX_ALLOWANCE_HOOK` (two-phase).      | `03-trigger`, `04-trigger-wrong-amount` | `04-transfer-within-cap`, `05-transfer-exceeds-cap` |
+| **Query and update**     | Mirror node REST API confirms hook registration and transaction history. `HookStoreTransaction` increases the cap cheaply.                                                                     | `05-query`                              | `06-query`, `07-increase-cap`                       |
+| **Re-trigger**           | Transfer after state update to confirm the updated cap is in effect.                                                                                                                           | (n/a)                                   | `08-transfer-after-increase`                        |
+| **Cleanup**              | Clear storage via `HookStoreTransaction`, delete hooks via `AccountUpdateTransaction.addHookToDelete()`, verify via mirror node, remove state keys.                                            | `06-cleanup`                            | `09-cleanup`                                        |
 
 ### The key distinction between the two hooks
 
