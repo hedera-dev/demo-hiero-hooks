@@ -11,10 +11,8 @@
  */
 
 import { getNetworkConfig } from "./utils/config.js";
-import { resetCosts } from "./utils/cost.js";
 
 async function main() {
-  resetCosts(); // start fresh cost log for this run
   const { network, operatorId, mirrorNodeUrl } = getNetworkConfig();
 
   console.log("=== Hiero Hooks Demo - Setup Verification ===");
