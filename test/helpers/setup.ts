@@ -1,5 +1,5 @@
 /**
- * Shared test setup for Hedera Hooks integration tests.
+ * Shared test setup for Hiero Hooks integration tests.
  * Provides a configured client and network config for all test files.
  */
 

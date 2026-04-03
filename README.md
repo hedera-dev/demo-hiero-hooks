@@ -1,4 +1,4 @@
-# Hedera Hooks Demo
+# Hiero Hooks Demo
 
 End-to-end demo for [HIP-1195 Hiero Hooks](https://github.com/hiero-ledger/hiero-improvement-proposals/blob/main/HIP/hip-1195.md) - programmable account-level logic that executes on transfers without smart contract overhead.
 

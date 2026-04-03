@@ -17,7 +17,7 @@ async function main() {
   resetCosts(); // start fresh cost log for this run
   const { network, operatorId, mirrorNodeUrl } = getNetworkConfig();
 
-  console.log("=== Hedera Hooks Demo - Setup Verification ===");
+  console.log("=== Hiero Hooks Demo - Setup Verification ===");
   console.log(`Network:      ${network}`);
   console.log(`Operator ID:  ${operatorId}`);
   console.log(`Mirror Node:  ${mirrorNodeUrl}`);

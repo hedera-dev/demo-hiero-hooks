@@ -1,6 +1,6 @@
 # Step-by-Step Guide
 
-End-to-end walkthrough for the HIP-1195 Hedera Hooks demo. Each demo is standalone - pick one or run both.
+End-to-end walkthrough for the HIP-1195 Hiero Hooks demo. Each demo is standalone - pick one or run both.
 
 > Expected output uses placeholder values. Your actual IDs, fees, and timestamps will differ.
 
@@ -91,7 +91,7 @@ npx tsx src/00-setup-verify.ts
 **Expected output:**
 
 ```
-=== Hedera Hooks Demo - Setup Verification ===
+=== Hiero Hooks Demo - Setup Verification ===
 Network:      testnet
 Operator ID:  0.0.XXXX
 Mirror Node:  https://testnet.mirrornode.hedera.com
