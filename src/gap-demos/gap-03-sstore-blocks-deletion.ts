@@ -1,17 +1,17 @@
 /**
  * gap-03-sstore-blocks-deletion.ts
  *
- * Gap P-1: sstore during hook execution blocks hook deletion
+ * Gap P-1: HookStore cannot remove slot 0 - hook deletion fails
  *
- * When a hook contract calls sstore() during EVM execution - as ManagedTransferCap
- * does in allowPost() when decrementing the remaining cap - the consensus node
- * tracks those slots in num_storage_slots. HookStoreTransaction cannot remove
- * these EVM-created slots, so the hook cannot be deleted.
+ * Observed: after ManagedTransferCap.allowPost() runs during a transfer (writing to
+ * slot 0), attempting to delete the hook fails with HOOK_DELETION_REQUIRES_ZERO_STORAGE_SLOTS.
+ * A prior HookStoreTransaction targeting slot 0x00 returns SUCCESS but num_storage_slots
+ * remains unchanged, blocking deletion.
  *
  * This script:
- *   1. Checks current num_storage_slots via mirror node (should be > 0 after cap/04)
+ *   1. Checks current num_storage_slots via mirror node
  *   2. Attempts to clear slot 0x00 via HookStoreTransaction (returns SUCCESS but
- *      does NOT decrement num_storage_slots)
+ *      num_storage_slots remains unchanged)
  *   3. Attempts hook deletion via AccountUpdateTransaction (fails with
  *      HOOK_DELETION_REQUIRES_ZERO_STORAGE_SLOTS)
  *
@@ -20,7 +20,7 @@
  *
  * Run:      npx tsx src/gap-demos/gap-03-sstore-blocks-deletion.ts
  * Requires: .state.json with capAccountId, capAccountPrivKey, capHookId
- *           AND at least one successful transfer (cap/04 or cap/08) so sstore ran
+ *           AND at least one successful transfer (cap/04 or cap/08)
  */
 
 import Long from "long";
@@ -41,7 +41,7 @@ import { loadState } from "../utils/state.js";
 async function main() {
   const state = loadState(
     ["capAccountId", "capAccountPrivKey", "capHookId"],
-    "run managed-transfer-cap/01 through 04 first (need at least one successful transfer to call sstore)",
+    "run managed-transfer-cap/01 through 04 first (need at least one successful transfer)",
   );
 
   const { mirrorNodeUrl } = getNetworkConfig();
@@ -49,11 +49,11 @@ async function main() {
   const capAccountKey = PrivateKey.fromStringECDSA(state.capAccountPrivKey!);
   const capAccountId = AccountId.fromString(state.capAccountId!);
 
-  console.log("=== Gap P-1: sstore during hook execution blocks hook deletion ===");
+  console.log("=== Gap P-1: HookStore cannot remove slot 0 - hook deletion fails ===");
   console.log("");
-  console.log("Gap:  ManagedTransferCap.allowPost() calls sstore() to decrement the cap.");
-  console.log("      EVM-created storage slots cannot be removed by HookStoreTransaction.");
-  console.log("      Result: HOOK_DELETION_REQUIRES_ZERO_STORAGE_SLOTS on hook delete.");
+  console.log("Observed: after a successful transfer, allowPost() writes to slot 0.");
+  console.log("          HookStoreTransaction targeting slot 0x00 returns SUCCESS");
+  console.log("          but num_storage_slots is unchanged. Hook deletion then fails.");
   console.log(`Account: ${state.capAccountId}  hookId: ${state.capHookId}`);
   console.log("");
 
@@ -76,11 +76,9 @@ async function main() {
       if (hook) {
         storageSlots = (hook.num_storage_slots as number) ?? 0;
         console.log(`hookId=${hook.hook_id}  num_storage_slots=${storageSlots}`);
-        if (storageSlots > 0) {
-          console.log("Confirmed: sstore created storage slots (from allowPost() during cap/04).");
-        } else {
-          console.log("Warning: num_storage_slots is 0.");
-          console.log("Run managed-transfer-cap/04-transfer-within-cap.ts first, then re-run this script.");
+        if (storageSlots === 0) {
+          console.log("Note: num_storage_slots is 0 per mirror node - but deletion may still fail.");
+          console.log("      See Gap M-2: mirror node counter may not reflect all on-chain slots.");
         }
       } else {
         console.log("Hook not found. Run managed-transfer-cap/02-create-account.ts first.");
@@ -96,7 +94,6 @@ async function main() {
 
   // -----------------------------------------------------------------------
   // Step 2: Attempt to clear slot 0x00 via HookStoreTransaction
-  // (returns SUCCESS but does not decrement num_storage_slots)
   // -----------------------------------------------------------------------
   console.log("--- Step 2: Attempt to clear slot 0x00 via HookStoreTransaction ---");
   console.log("Expected: SUCCESS reported, but num_storage_slots unchanged.");
@@ -122,9 +119,7 @@ async function main() {
     const clearReceipt = await clearResponse.getReceipt(client);
     console.log(`HookStoreTransaction status: ${clearReceipt.status}`);
     console.log(`Transaction: ${clearResponse.transactionId}`);
-    console.log("Note: SUCCESS reported. But num_storage_slots was NOT decremented.");
-    console.log("      The EVM-sstore code path in applyStorageMutations() is not reachable");
-    console.log("      from HookStoreTransaction for REMOVE operations.");
+    console.log("Note: SUCCESS reported but num_storage_slots remains unchanged.");
   } catch (err: unknown) {
     console.log(`Storage clear error: ${(err as Error).message.split("\n")[0]}`);
   }
@@ -154,7 +149,7 @@ async function main() {
     const msg = (err as Error).message;
     if (msg.includes("HOOK_DELETION_REQUIRES_ZERO_STORAGE_SLOTS")) {
       console.log("Got expected error: HOOK_DELETION_REQUIRES_ZERO_STORAGE_SLOTS");
-      console.log("Gap P-1 confirmed: hook with EVM-sstore slots cannot be deleted.");
+      console.log("Gap P-1 confirmed: hook deletion fails after slot 0 write.");
     } else {
       console.log(`Got error: ${msg.split("\n")[0]}`);
     }
@@ -162,13 +157,12 @@ async function main() {
 
   console.log("");
   console.log("=== Summary ===");
-  console.log("Gap P-1: WritableEvmHookStore cannot remove slots created by EVM sstore.");
-  console.log("Affected: any hook that calls sstore() - ManagedTransferCap, stateful hooks generally.");
-  console.log("Workaround: clear slot to 0 so allowPre() returns false (disables the hook).");
-  console.log("Fix needed: REMOVE path in applyStorageMutations() must be reachable from");
-  console.log("            HookStoreTransaction for EVM-sstore-created entries.");
-  console.log("Relevant code: WritableEvmHookStore.java in hiero-ledger/hiero-consensus-node");
-  console.log("Related PR (different fix): https://github.com/hiero-ledger/hiero-consensus-node/pull/24733");
+  console.log("Gap P-1: HookStore cannot remove slot 0 - hook deletion fails with");
+  console.log("         HOOK_DELETION_REQUIRES_ZERO_STORAGE_SLOTS.");
+  console.log("Affected: hooks that write to slot 0 during execution (e.g. ManagedTransferCap).");
+  console.log("Workaround: write a zero/false value to the controlling slot so allowPre()");
+  console.log("            rejects all transfers (disables the hook without deleting it).");
+  console.log("Related PR: https://github.com/hiero-ledger/hiero-consensus-node/pull/24733");
 
   client.close();
 }
