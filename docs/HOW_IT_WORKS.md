@@ -144,6 +144,8 @@ Every SDK class imported across the demo scripts, with the script that uses it a
 | `EvmHook`                   | `hh/02`, `cap/02`                                        | Wraps a `ContractId` to identify the hook's implementing contract                               |
 | `FungibleHookCall`          | `hh/03`, `hh/04`, `cap/04`, `cap/05`, `cap/08`           | Attaches a hook invocation to a fungible transfer leg                                           |
 | `FungibleHookType`          | `hh/03`, `hh/04`, `cap/04`, `cap/05`, `cap/08`           | Enum; `PRE_TX_ALLOWANCE_HOOK` (HelloHooks) or `PRE_POST_TX_ALLOWANCE_HOOK` (ManagedTransferCap) |
+| `NftHookCall`               | (not yet used - see NFT Hook Types section)               | Attaches a hook invocation to an NFT transfer leg; takes `hookId`, `NftHookType`, and `EvmHookCall` |
+| `NftHookType`               | (not yet used - see NFT Hook Types section)               | Enum; encodes timing AND which account's hook fires: `PRE_HOOK_SENDER`, `PRE_POST_HOOK_SENDER`, `PRE_HOOK_RECEIVER`, `PRE_POST_HOOK_RECEIVER` |
 | `EvmHookCall`               | `hh/03`, `hh/04`, `cap/04`, `cap/05`, `cap/08`           | Specifies `gasLimit` for the hook's EVM execution                                               |
 | `EvmHookStorageSlot`        | `cap/03`, `cap/07`, `cap/09`                             | Key-value pair for a hook storage write or delete                                               |
 | `HookId`                    | `cap/03`, `cap/07`, `cap/09`                             | Composite identifier: `(entityId, hookId)` scoping storage to an account's hook                 |
@@ -295,3 +297,62 @@ The demo covers the complete lifecycle of a Hiero hook from deployment through c
 HelloHooks is **single-phase** - `allow()` inspects `ProposedTransfers` and approves only exactly 1 HBAR (100,000,000 tinybars). It uses `PRE_TX_ALLOWANCE_HOOK` and demonstrates the hook pattern with amount enforcement: deploy, attach, trigger with correct amount (approved), trigger with wrong amount (rejected). Both HelloHooks and ManagedTransferCap inspect `ProposedTransfers`, but HelloHooks does a simple exact-amount check while ManagedTransferCap tracks a running cap with two-phase state updates.
 
 ManagedTransferCap is **stateful and two-phase** - it uses `PRE_POST_TX_ALLOWANCE_HOOK` with `allowPre()` and `allowPost()`. `allowPre()` reads the remaining cap from slot 0x00 and checks the proposed transfer amount from `ProposedTransfers`. `allowPost()` deducts the amount from the cap and writes the updated value back. This demonstrates the full hook storage lifecycle: write state via `HookStoreTransaction`, read and update state during two-phase EVM execution, and increase the cap cheaply via `HookStoreTransaction` without any EVM execution.
+
+---
+
+## NFT Hook Types (not yet demoed - reference)
+
+This repo only demonstrates fungible token and HBAR transfers. NFT transfers use a different hook call class and a different set of hook type enum values. The distinction matters when reading HIP-1195 or writing a hook contract that handles both transfer types.
+
+### FungibleHookCall vs NftHookCall
+
+Both classes attach a hook invocation to a `TransferTransaction`, but they are used for different asset types:
+
+| Class            | Used for                              | Hook type enum        |
+| ---------------- | ------------------------------------- | --------------------- |
+| `FungibleHookCall` | HBAR and HTS fungible token transfers | `FungibleHookType`    |
+| `NftHookCall`      | HTS NFT transfers                     | `NftHookType`         |
+
+### FungibleHookType values
+
+| Value                       | Phases    | Description                                                                                                          |
+| --------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------- |
+| `PRE_TX_ALLOWANCE_HOOK`     | Pre only  | Hook runs before the transfer executes. Use for pure allow/deny logic with no post-execution state update needed.   |
+| `PRE_POST_TX_ALLOWANCE_HOOK` | Pre + post | Hook runs before (`allowPre`) and after (`allowPost`) the transfer. Use when the hook must update state based on the actual settled amounts (e.g., decrementing a cap). |
+
+HelloHooks uses `PRE_TX_ALLOWANCE_HOOK`. ManagedTransferCap uses `PRE_POST_TX_ALLOWANCE_HOOK`.
+
+### NftHookType values
+
+NFT transfers expose four hook types. The split is across two axes: **timing** (pre vs pre+post) and **whose hook fires** (sender vs receiver):
+
+| Value                    | Timing    | Fires on whose account | Description                                                                                          |
+| ------------------------ | --------- | ---------------------- | ---------------------------------------------------------------------------------------------------- |
+| `PRE_HOOK_SENDER`        | Pre only  | NFT sender's account   | Hook fires before the NFT leaves the sender. Use for sender-side allow/deny with no post needed.    |
+| `PRE_POST_HOOK_SENDER`   | Pre + post | NFT sender's account  | Hook fires before and after on the sender's account. Use when the sender needs post-transfer cleanup or state update. |
+| `PRE_HOOK_RECEIVER`      | Pre only  | NFT receiver's account | Hook fires before the NFT arrives at the receiver. Use for receiver-side allow/deny (e.g., block certain NFT classes). |
+| `PRE_POST_HOOK_RECEIVER` | Pre + post | NFT receiver's account | Hook fires before and after on the receiver's account. Use for receiver-side logic that needs to inspect or record the settled transfer. |
+
+**Key difference from fungible hooks:** Fungible hook type only encodes timing (pre vs pre+post) because there is a single account whose hook fires (the account being protected). NFT hook type encodes both timing AND which account's hook fires (sender or receiver), because both the sender and receiver can independently have hooks attached.
+
+### Usage pattern for NftHookCall
+
+```typescript
+import { NftHookCall, NftHookType, EvmHookCall } from "@hiero-ledger/sdk";
+import Long from "long";
+
+// Sender-side pre-only hook on an NFT transfer
+const transfer = new TransferTransaction()
+  .addNftTransfer(tokenId, serialNumber, senderAccountId, receiverAccountId)
+  .addNftHookCall(
+    new NftHookCall()
+      .setHookId(Long.fromInt(hookId))
+      .setHookType(NftHookType.PRE_HOOK_SENDER)
+      .setEvmHookCall(new EvmHookCall().setGasLimit(Long.fromInt(60000)))
+  )
+  .setMaxTransactionFee(new Hbar(5));
+```
+
+For a receiver-side hook, replace `NftHookType.PRE_HOOK_SENDER` with `NftHookType.PRE_HOOK_RECEIVER` and ensure the `hookId` matches what was set in `HookCreationDetails` on the receiver's account.
+
+> The demo repo does not yet include an NFT hook example. The patterns above are for reference when extending the repo or writing your own NFT-gated logic.
